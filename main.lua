@@ -35,6 +35,33 @@ function Planet:draw()
   love.graphics.draw(self.image,self.x,self.y,0,scale,nil,self.image:getWidth()/2,self.image:getHeight()/2)
   love.graphics.setColor(1,1,1)
 end
+function Planet:getNearest(aClass,x,y)
+  local closestObject
+  local clostestDist2
+
+  for _, contact in ipairs(self.body:getContacts()) do
+    local fixtureA, fixtureB = contact:getFixtures()
+    local object = fixtureA:getUserData()
+    if instanceOf(aClass, object) then
+      local dist2 = vec.dist2(self.body:getX(), self.body:getY(), object.body:getX(), object.body:getY())
+      if clostestDist2 == nil or clostestDist2 > dist2 then
+        clostestDist2 = dist2
+        closestObject = object
+      end
+    end
+  end
+  local dir = 0
+  if closestObject then
+    local tx,ty = closestObject.body:getPosition()
+    dir = self:getDirToTarget(x,y,tx,ty)
+  end
+  return closestObject, dir
+end
+function Planet:getDirToTarget(x,y,tx,ty)
+  local px,py = self.body:getPosition()
+  local d = vec.dot(tx-px,ty-py,-(y-py),x-px)
+  return d > 0 and 1 or -1
+end
 
 KeyController = class('KeyController')
 function KeyController:initialize(keyLeft, keyRight, keyShoot)
@@ -44,17 +71,46 @@ function KeyController:initialize(keyLeft, keyRight, keyShoot)
 end
 function KeyController:update(dt)
   if love.keyboard.isDown(self.keyLeft) then
-    self.player.dir = -1
+    self.player:move(-1)
   elseif love.keyboard.isDown(self.keyRight) then
-    self.player.dir = 1
+    self.player:move(1)
   else
-    self.player.dir = 0
+    self.player:move(0)
   end
 
   if love.keyboard.isDown(self.keyShoot) and self.lastShootKey == false then
     self.player:shoot()
   end
   self.lastShootKey = love.keyboard.isDown(self.keyShoot)
+end
+function KeyController:draw()
+end
+
+AIController = class('AIController')
+function AIController:initialize(enemy)
+  self.enemy = enemy
+end
+function AIController:update(dt)
+  local player = self.player
+  if player.junk then
+    local ex,ey = self.enemy.body:getPosition()
+    local vx,vy = vec.normalize(self.player.body:getLinearVelocity())
+    local dx,dy = vec.normalize(vec.sub(ex,ey,self.player.body:getPosition()))
+    if vec.dot(vx,vy,dx,dy) > math.cos(10/180*math.pi) then
+      self.player:shoot()
+    end
+  else
+    local junk, dir = player.planet:getNearest(Junk, player.body:getPosition())
+    if junk then
+      player:move(dir)
+    else
+      -- TODO: Add IDLE logic
+      player:move(0)
+    end
+  end
+end
+function AIController:draw()
+
 end
 
 Player = class('Player')
@@ -72,7 +128,11 @@ function Player:initialize(world,planet,controller)
   self.fixture:setGroupIndex(-1)
   self.body:setFixedRotation(true)
   self.controller = controller
+  self:move(0)
   controller.player = self
+end
+function Player:move(dir)
+  self.dir = dir
 end
 function Player:update(dt)
   self.controller:update(dt)
@@ -115,13 +175,8 @@ function Player:draw()
   local rot = self.body:getAngle()
   love.graphics.setColor(1,0.5,0.5)
   love.graphics.draw(self.image,self.body:getX(),self.body:getY(),rot,scale,nil,self.image:getWidth()/2,self.image:getHeight()/2)
-  --[[if self.junk then
-    love.graphics.setColor(Junk.color)
-    local x,y = vec.add(self.body:getX(), self.body:getY(), vec.fromPolar(self.dir-math.pi/2,self.radius))
-    love.graphics.circle("fill", x,y, Junk.radius)
-  end
-  ]]--
   love.graphics.setColor(1,1,1)
+  self.controller:draw()
 end
 
 function Player:shoot()
@@ -178,7 +233,8 @@ gWorld:setGravity(0,0)
 
 local planet1 = Planet(gWorld,300,400)
 local planet2 = Planet(gWorld,900,400)
-local player2 = Player(gWorld,planet2,KeyController('a','d','space'))
+local player1 = Player(gWorld,planet1,KeyController('a','d','space'))
+local player2 = Player(gWorld,planet2,AIController(player1))
 
 function love.load()
 end
@@ -246,8 +302,8 @@ function love.draw()
 end
 
 function love.mousepressed(x, y, button, istouch, presses)
-  if button == 2 and not player2.junk then
-    player2:takeOwnership(Junk(gWorld,0,0,0,0).fixture)
+  if button == 2 and not player1.junk then
+    player1:takeOwnership(Junk(gWorld,0,0,0,0).fixture)
   end
 end
 

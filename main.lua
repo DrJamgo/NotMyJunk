@@ -36,35 +36,55 @@ function Planet:draw()
   love.graphics.setColor(1,1,1)
 end
 
+KeyController = class('KeyController')
+function KeyController:initialize(keyLeft, keyRight, keyShoot)
+  self.keyLeft = keyLeft
+  self.keyRight = keyRight
+  self.keyShoot = keyShoot
+end
+function KeyController:update(dt)
+  if love.keyboard.isDown(self.keyLeft) then
+    self.player.dir = -1
+  elseif love.keyboard.isDown(self.keyRight) then
+    self.player.dir = 1
+  else
+    self.player.dir = 0
+  end
+
+  if love.keyboard.isDown(self.keyShoot) and self.lastShootKey == false then
+    self.player:shoot()
+  end
+  self.lastShootKey = love.keyboard.isDown(self.keyShoot)
+end
+
 Player = class('Player')
 Player.radius = 20
 Player.speed = 300
 Player.image = love.graphics.newImage('assets/sad-crab.png')
-function Player:initialize(world,planet)
+function Player:initialize(world,planet,controller)
   self.body = love.physics.newBody(gWorld,planet.body:getX(),planet.body:getY()-planet.radius-self.radius, 'dynamic')
   self.shape = love.physics.newCircleShape(self.radius)
   self.fixture = love.physics.newFixture(self.body, self.shape, 1)
   self.body:setMass(0.2)
-  self.fixture:setFriction(1)
+  self.fixture:setFriction(0)
   self.fixture:setUserData(self)
   self.planet=planet
+  self.fixture:setGroupIndex(-1)
+  self.body:setFixedRotation(true)
+  self.controller = controller
+  controller.player = self
 end
 function Player:update(dt)
+  self.controller:update(dt)
   local dx,dy = self.body:getX() - self.planet.body:getX(), self.body:getY() - self.planet.body:getY()
-  self.dir = math.atan2(dx,-dy)
-  self.normal = self.dir-math.pi/2
+  local angle = math.atan2(dx,-dy)
+  self.normal = angle-math.pi/2
   local speed = self.speed
-  if love.keyboard.isDown('a') then
-    self.body:setLinearVelocity(-math.cos(self.dir)*speed,-math.sin(self.dir)*speed)
-    self.move = true
-  elseif love.keyboard.isDown('d') then
-    self.body:setLinearVelocity(math.cos(self.dir)*speed,math.sin(self.dir)*speed)
-    self.move = true
-  else
-    self.body:setLinearVelocity(0,0)
-    self.move = nil
-  end
-  self.dir = self.dir + math.sin(love.timer.getTime() * self.speed/8)*math.pi/10*(self.move and 1 or 0)
+  local angle2 = math.pi/10 * self.dir
+  self.body:setLinearVelocity(self.dir*math.cos(angle+angle2)*speed,self.dir*math.sin(angle+angle2)*speed)
+
+  angle = angle + math.sin(love.timer.getTime() * self.speed/8)*math.pi/10*(self.dir)
+  self.body:setAngle(angle)
 
   for _,contact in ipairs(self.body:getContacts()) do
     local me, other = contact:getFixtures()
@@ -78,33 +98,44 @@ function Player:update(dt)
       if self.junk and other ~= self.junk then
         -- dead
       else
-        other:destroy()
-        self.junk = other
+        --other:destroy()
+        self:takeOwnership(other)
       end
     end
   end
 end
+function Player:takeOwnership(junk)
+  self.junk = junk
+  local x,y = vec.add(self.body:getX(), self.body:getY(), vec.fromPolar(self.normal,self.radius))
+  self.junk:getBody():setPosition(x,y)
+  self.junkJoint = love.physics.newWeldJoint(self.body, self.junk:getBody(), x, y, false)
+end
 function Player:draw()
   local scale = self.radius / self.image:getWidth() * 2 * 1.5
-  local rot = self.dir
+  local rot = self.body:getAngle()
   love.graphics.setColor(1,0.5,0.5)
   love.graphics.draw(self.image,self.body:getX(),self.body:getY(),rot,scale,nil,self.image:getWidth()/2,self.image:getHeight()/2)
-  if self.junk then
+  --[[if self.junk then
     love.graphics.setColor(Junk.color)
-    local x,y = vec.add(self.body:getX(), self.body:getY(), vec.fromPolar(rot-math.pi/2,self.radius))
+    local x,y = vec.add(self.body:getX(), self.body:getY(), vec.fromPolar(self.dir-math.pi/2,self.radius))
     love.graphics.circle("fill", x,y, Junk.radius)
   end
+  ]]--
   love.graphics.setColor(1,1,1)
 end
+
 function Player:shoot()
-  --local dx,dy = vec.normalize(x-player2.body:getX(),y-player2.body:getY())
-  local dx,dy = vec.fromPolar(self.normal,1)
-  local px,py = vec.mul((Junk.radius+self.radius)*1.1,dx,dy)
-  local pvx,pvy = self.body:getLinearVelocity()
-  local vx,vy = vec.add(pvx,pvy,vec.mul(300,dx,dy))
-  local x,y = vec.add(px,py,self.body:getPosition())
-  local Junk = Junk(gWorld,x,y,vx,vy)
-  self.junk = nil
+  if self.junk then
+    local dx,dy = vec.fromPolar(self.normal,1)
+    local px,py = vec.mul((Junk.radius+self.radius)*1.1,dx,dy)
+    local pvx,pvy = self.body:getLinearVelocity()
+    local vx,vy = vec.add(pvx,pvy,vec.mul(300,dx,dy))
+    local x,y = vec.add(px,py,self.body:getPosition())
+    self.junk:getUserData():shoot(vx,vy)
+    self.junkJoint:destroy()
+    self.junkJoint = nil
+    self.junk = nil
+  end
 end
 
 Junk = class('Junk')
@@ -121,6 +152,20 @@ function Junk:initialize(world,x,y,vx,vy)
   self.fixture:setFriction(10)
   self.body:setAngularDamping(1)
 end
+function Junk:shoot(vx,vy)
+  self.body:setLinearVelocity(vx,vy)
+  self.suppresscolide = 0.2
+  self.fixture:setGroupIndex(-1)
+end
+function Junk:update(dt)
+  if self.suppresscolide then
+    self.suppresscolide = self.suppresscolide - dt
+    if self.suppresscolide < 0 then
+      self.suppresscolide = nil
+      self.fixture:setGroupIndex(0)
+    end
+  end
+end
 function Junk:draw2()
   love.graphics.setColor(self.color)
   love.graphics.circle("fill", self.body:getX(), self.body:getY(), self.shape:getRadius())
@@ -133,7 +178,7 @@ gWorld:setGravity(0,0)
 
 local planet1 = Planet(gWorld,300,400)
 local planet2 = Planet(gWorld,900,400)
-local player2 = Player(gWorld,planet2)
+local player2 = Player(gWorld,planet2,KeyController('a','d','space'))
 
 function love.load()
 end
@@ -201,10 +246,8 @@ function love.draw()
 end
 
 function love.mousepressed(x, y, button, istouch, presses)
-  if button == 1 and player2.junk then
-    player2:shoot()
-  elseif button == 2 then
-    player2.junk = true
+  if button == 2 and not player2.junk then
+    player2:takeOwnership(Junk(gWorld,0,0,0,0).fixture)
   end
 end
 

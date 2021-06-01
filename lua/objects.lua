@@ -176,6 +176,19 @@ Player = class('Player')
 Player.radius = 15
 Player.speed = 300
 Player.image = love.graphics.newImage('assets/sad-crab.png')
+Player.sounds = {
+  {'your junk',  love.audio.newSource('assets/sound1.ogg', 'stream')},
+  {'not mine',   love.audio.newSource('assets/sound2.ogg', 'stream')},
+  {'thats yours',love.audio.newSource('assets/sound3.ogg', 'stream')},
+  {'take it',    love.audio.newSource('assets/sound4.ogg', 'stream')},
+  {'no you',     love.audio.newSource('assets/sound5.ogg', 'stream')},
+  {'dont want it',love.audio.newSource('assets/sound6.ogg', 'stream')},
+  {'its yours',  love.audio.newSource('assets/sound7.ogg', 'stream')},
+  {'its not mine',love.audio.newSource('assets/sound8.ogg', 'stream')},
+  {'here',       love.audio.newSource('assets/sound9.ogg', 'stream')},
+  {'its yours',  love.audio.newSource('assets/sound10.ogg', 'stream')}
+}
+
 function Player:initialize(world,planet,controller)
   local x,y = vec.add(planet.x, planet.y,vec.randomDirection(self.radius+planet.radius))
   self.body = love.physics.newBody(world,x,y, 'dynamic')
@@ -188,14 +201,26 @@ function Player:initialize(world,planet,controller)
   self.fixture:setGroupIndex(-1)
   self.body:setFixedRotation(true)
   self.controller = controller
+  self.exclaims = {}
   self:move(0)
   controller.player = self
 end
 function Player:move(dir)
   self.dir = dir
 end
+function Player:exclaim(color)
+  local sound = self.sounds[love.math.random(1,#self.sounds)]
+  love.audio.play(sound[2])
+  table.insert(self.exclaims, {color=color, text=sound[1], time=0.5, x=self.body:getX(), y=self.body:getY()})
+end
 function Player:update(dt)
   self.controller:update(dt)
+  for _,exclaim in ipairs(self.exclaims) do
+    exclaim.time = exclaim.time - dt
+    if exclaim.time < 0 then
+      table.remove(self.exclaims,_)
+    end
+  end
 
   local dx,dy = self.body:getX() - self.planet.body:getX(), self.body:getY() - self.planet.body:getY()
   local angle = math.atan2(dx,-dy)
@@ -238,10 +263,16 @@ function Player:draw()
   love.graphics.draw(self.image,self.body:getX(),self.body:getY(),rot,scale,nil,self.image:getWidth()/2,self.image:getHeight()/2)
   love.graphics.setColor(1,1,1)
   self.controller:draw()
+
+  for _,exclaim in ipairs(self.exclaims) do
+    love.graphics.print({exclaim.color, exclaim.text},exclaim.x,exclaim.y,0,(0.5+exclaim.time)*2)
+  end
+
 end
 
 function Player:shoot()
   if self.junk then
+    self:exclaim(self.planet.color)
     local dx,dy = vec.fromPolar(self.normal,1)
     local px,py = vec.mul((Junk.radius+self.radius)*1.1,dx,dy)
     local pvx,pvy = self.body:getLinearVelocity()
@@ -292,7 +323,7 @@ function Junk:update(dt)
   for _,contact in ipairs(self.body:getContactList()) do
     --if contact:isTouching() then
       local planet = getOtherFixture(self.fixture,contact):getUserData()
-      if planet and instanceOf(Planet, planet) then
+      if planet and instanceOf(Planet, planet) and planet ~= self.planet then
         self.planet = planet
         self.color = planet.color
         break

@@ -8,6 +8,7 @@ local G = 30000
 local atmosphere = 30
 
 Level = class("Level")
+Level.victorysound = love.audio.newSource('assets/sound_hurray.ogg', 'stream')
 function Level:initialize()
   self.time = -3
 end
@@ -49,6 +50,7 @@ function Level:update(dt)
   
     for _,planet in ipairs(self.planets) do
       if planet.junk == 0 then
+        love.audio.play(self.victorysound)
         Gamestate.switch(WinScreen(),planet)
         break
       end

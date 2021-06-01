@@ -7,7 +7,7 @@ local fontCaption = love.graphics.newFont(36)
 local spaceImage = love.graphics.newImage('assets/space.jpg')
 
 
-function Menu:load()
+function Menu:initialize()
 
 end
 
@@ -15,6 +15,7 @@ function Menu:update(dt)
   suit.layout:reset(love.graphics.getWidth()/3,200)
   suit.layout:padding(20,20)
 
+  self.inputMode = 'keyboard'
   if self.inputMode == nil then
     suit.Label('Select Input Mode:',suit.layout:row(love.graphics.getWidth()/3,30))
     if suit.Button('keyboard', suit.layout:row(love.graphics.getWidth()/3,50)).hit then
@@ -24,7 +25,7 @@ function Menu:update(dt)
       self.inputMode = 'touch'
     end
   elseif self.numPlayers == nil then
-    suit.Label('Select Input Mode:',suit.layout:row(love.graphics.getWidth()/3,30))
+    suit.Label('Select Player Count:',suit.layout:row(love.graphics.getWidth()/3,30))
 
     if suit.Button('0 Players', suit.layout:row(love.graphics.getWidth()/3,50)).hit then
       self.numPlayers = 0
@@ -41,7 +42,7 @@ function Menu:update(dt)
   else
     suit.Label('Select Level:',suit.layout:row(love.graphics.getWidth()/3,50))
 
-    if suit.Button('Level1', suit.layout:row()).hit then
+    if suit.Button('Level 1 (ony one level for now)', suit.layout:row()).hit then
       Gamestate.switch(Level1(), self.numPlayers)
     end
     if suit.Button('<- back', suit.layout:row()).hit then

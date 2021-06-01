@@ -13,6 +13,10 @@ require 'middleclass'
 require 'objects'
 require 'menu'
 
+local bgmusic = love.audio.newSource('assets/OutThere.ogg', 'static')
+bgmusic:setLooping(true)
+love.audio.play(bgmusic)
+
 function love.load()
   Gamestate.registerEvents()
   Gamestate.switch(Menu())

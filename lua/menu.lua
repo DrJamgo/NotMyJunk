@@ -36,8 +36,9 @@ function Menu:update(dt)
     if suit.Button('2 Players', suit.layout:row()).hit then
       self.numPlayers = 2
     end
-    if suit.Button('<- back', suit.layout:row()).hit then
-      self.inputMode = nil
+    suit.layout:row()
+    if suit.Button('GitHub Sources (and Credits)', suit.layout:row()).hit then
+      love.system.openURL('https://github.com/DrJamgo/NotMyJunk')
     end
   else
     suit.Label('Select Level:',suit.layout:row(love.graphics.getWidth()/3,50))

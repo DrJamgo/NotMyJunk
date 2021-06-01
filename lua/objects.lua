@@ -211,7 +211,10 @@ end
 function Player:exclaim(color)
   local sound = self.sounds[love.math.random(1,#self.sounds)]
   love.audio.play(sound[2])
-  table.insert(self.exclaims, {color=color, text=sound[1], time=0.5, x=self.body:getX(), y=self.body:getY()})
+  local dx,dy = vec.sub(self.body:getX(), self.body:getY(), self.planet.body:getPosition())
+  local dx,dy = vec.mul(1.5,dx,dy)
+  local x,y = vec.add(dx,dy,self.planet.body:getPosition())
+  table.insert(self.exclaims, {color=color, text=sound[1], time=0.5, x=x, y=y})
 end
 function Player:update(dt)
   self.controller:update(dt)
@@ -250,12 +253,14 @@ function Player:update(dt)
     end
   end
 end
+
 function Player:takeOwnership(junk)
   self.junk = junk
   local x,y = vec.add(self.body:getX(), self.body:getY(), vec.fromPolar(self.normal,self.radius))
   self.junk:getBody():setPosition(x,y)
   self.junkJoint = love.physics.newWeldJoint(self.body, self.junk:getBody(), x, y, false)
 end
+
 function Player:draw()
   local scale = self.radius / self.image:getWidth() * 2 * 1.5
   local rot = self.body:getAngle()
@@ -265,7 +270,8 @@ function Player:draw()
   self.controller:draw()
 
   for _,exclaim in ipairs(self.exclaims) do
-    love.graphics.print({exclaim.color, exclaim.text},exclaim.x,exclaim.y,0,(0.5+exclaim.time)*2)
+    local scale = (0.5+exclaim.time)*2
+    love.graphics.printf({exclaim.color, exclaim.text},exclaim.x-100,exclaim.y,200/scale,'center',0,scale)
   end
 
 end

@@ -1,3 +1,6 @@
 [submodule "lua/hump"]
 	path = lua/hump
 	url = git@github.com:vrld/hump.git
+[submodule "lua/suit"]
+	path = lua/suit
+	url = git@github.com:DrJamgo/suit.git

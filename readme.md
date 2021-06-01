@@ -1,5 +1,8 @@
 # Not My Junk
 
+A Game abotut getting rid of your junk.
+![Preview](docs/preview.gif)
+
 ## Free Assets
 ### Assets by Lorc
 Planet https://game-icons.net/1x1/lorc/world.html
